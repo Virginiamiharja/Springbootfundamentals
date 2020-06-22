@@ -9,13 +9,18 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
+import com.cimb.tokolapak.dao.DepartmentRepo;
 import com.cimb.tokolapak.dao.EmployeeAddressRepo;
 import com.cimb.tokolapak.dao.EmployeeRepo;
+import com.cimb.tokolapak.dao.ProjectRepo;
+import com.cimb.tokolapak.entity.Department;
 import com.cimb.tokolapak.entity.Employee;
 import com.cimb.tokolapak.entity.EmployeeAddress;
 import com.cimb.tokolapak.entity.Product;
+import com.cimb.tokolapak.entity.Project;
+import com.cimb.tokolapak.service.DepartmentService;
 import com.cimb.tokolapak.service.EmployeeService;
+import com.cimb.tokolapak.util.EmailUtil;
 
 @RestController
 @RequestMapping("/employee")
@@ -30,9 +35,46 @@ public class EmployeeController {
 	@Autowired
 	private EmployeeAddressRepo employeeAddressRepo;
 	
+	@Autowired
+	private DepartmentService departmentService;
+	
+	@Autowired 
+	private DepartmentRepo departmentRepo;
+	
+	@Autowired
+	private ProjectRepo projectRepo;
+	
+	@Autowired
+	private EmailUtil emailUtil;
+	
 	@PostMapping
 	public Employee addEmployee(@RequestBody Employee employee) {
 		return employeeRepo.save(employee);
+	}
+	
+	@PostMapping("/department/{departmentId}")
+	public Employee addEmployeewithDepartment(@PathVariable int departmentId, @RequestBody Employee employee) {
+		Department department = departmentRepo.findById(departmentId).get();
+		 
+		if(department == null)
+			throw new RuntimeException("Department not found");
+		
+		employee.setDepartment(department);
+		emailUtil.sendEmail(employee.getEmail(), "REGISTRASI KARYAWAN", "<h1>SELAMAT</h1> Anda telah bergabung bersama kami");
+		
+		return employeeRepo.save(employee);
+	}
+	
+	@PostMapping("{employeeId}/projects/{projectId}")
+	public Employee addProjectToEmployee(@PathVariable int employeeId, @PathVariable int projectId) {
+		Employee findEmployee = employeeRepo.findById(employeeId).get();
+		
+		Project findProject = projectRepo.findById(projectId).get();
+		
+//		Get project itu kan sebuah list, makanya dia bisa ngeadd
+		findEmployee.getProjects().add(findProject);
+		
+		return employeeRepo.save(findEmployee);
 	}
 	
 	@GetMapping
@@ -81,4 +123,37 @@ public class EmployeeController {
 		return employeeRepo.findById(id);
 	}
 	
+	// Cara nambahin employee address dari kakaknya
+	@PutMapping("/{employeeId}/address")
+	public Employee addAddressToEmployee(@PathVariable int id, @RequestBody EmployeeAddress employeeAddress) {
+		Employee findEmployee = employeeRepo.findById(id).get();
+		
+		if(findEmployee == null) throw new RuntimeException("Employee not found");
+		
+		findEmployee.setEmployeeAddress(employeeAddress);
+		
+		return employeeRepo.save(findEmployee);
+	}
+	
+	@PutMapping("{employeeId}/department/{departmentId}")
+	public Employee addEmployeeToDepartment(@PathVariable int departmentId, @PathVariable int employeeId) {
+		Employee findEmployee = employeeRepo.findById(employeeId).get();
+		
+		if(findEmployee == null)
+			throw new RuntimeException("Employee not found");
+		
+		Department department = departmentRepo.findById(departmentId).get();
+		if(department == null)
+			throw new RuntimeException("Department not found");
+		
+		findEmployee.setDepartment(department);
+		return employeeRepo.save(findEmployee);
+		
+//		Harusnya si pasti yang masuk cuma 1 tapi pake map untuk mempermudah aja katanya
+//		return departmentRepo.findById(departmentId).map(department -> {
+//			findEmployee.setDepartment(department);
+//			return employeeRepo.save(findEmployee);
+//		}).orElseThrow(() -> new RuntimeException("Department not found"));	
+//	}
+	}
 }
